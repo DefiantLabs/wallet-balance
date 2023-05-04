@@ -1,0 +1,51 @@
+version: "3.9"
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 100m
+      max-file: "3"
+      tag: '{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}'
+
+services:
+  postgres:
+    restart: "unless-stopped"
+    image: postgres:15-alpine
+    stop_grace_period: 1m
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      # - postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    ports:
+      - 5432:5432/tcp
+    healthcheck:
+      test: ["CMD", "nc", "-z", "-v", "localhost", "5432"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      default:
+        aliases:
+          - default
+    <<: *logging
+
+  # app:
+  #   build: .
+  #   restart: "unless-stopped"
+  #   ports:
+  #     - 5000:5000/tcp
+  #   environment:
+  #     - CONFIG_FILE=config.toml
+  #     - POSTGRES_HOST=postgres
+  #     - POSTGRES_USER=user
+  #     - POSTGRES_PASSWORD=password
+  #     - POSTGRES_DB=wallets
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     default:
+  #       aliases:
+  #         - app
+  #   <<: *logging
