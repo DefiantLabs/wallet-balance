@@ -14,12 +14,14 @@ rpc_servers = config["blockchains"]
 # Set up the database connection
 db_config = config["database"]
 
+
 # Define a function to check if an account exists on a blockchain
 def account_exists(blockchain, address):
     rpc_server = rpc_servers[blockchain]
     response = requests.get(rpc_server + "/auth/accounts/" + address)
     print(response)
     return response.status_code == 200
+
 
 # Define a function to save a wallet address to the remote database
 def save_wallet(user_id, wallet_address):
@@ -58,6 +60,7 @@ def save_wallet(user_id, wallet_address):
         cur.close()
         conn.close()
 
+
 # Define a function to handle the "!save" command
 def handle_save_command(command, username):
     tokens = command.split()
@@ -78,6 +81,7 @@ def handle_save_command(command, username):
     # Save the wallet to the remote database and the local wallet dictionary
     save_wallet(username, address)
     return "Wallet {} saved for user {}".format(address, username)
+
 
 # Define a function to handle the "!show wallets" command
 def handle_show_wallets_command(username):
@@ -112,8 +116,9 @@ def handle_show_wallets_command(username):
         cur.close()
         conn.close()
 
+
 # Define a function to handle the "!show" command
-def handle_show_command(command):
+def handle_show_command(command, username):
     tokens = command.split()
     if len(tokens) != 1:
         return "Invalid command: expected '!show'"
@@ -145,6 +150,7 @@ def handle_show_command(command):
     finally:
         cur.close()
         conn.close()
+
 
 if __name__ == "__main__":
     while True:

@@ -11,4 +11,3 @@ password = "password"
 
 [blockchains]
 kujira = "https://kujira-rpc.nodes.defiantlabs.net"
-
