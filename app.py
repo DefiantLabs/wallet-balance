@@ -2,6 +2,15 @@ import toml
 import requests
 import psycopg2
 
+from cosmpy.aerial.client import LedgerClient, NetworkConfig
+
+kujira_config = NetworkConfig(           chain_id="kaiyo-1",
+            url="grpc+https://grpc-kujira-ia.cosmosia.notional.ventures:443",
+            fee_minimum_gas_price=0,
+            fee_denomination="uusk",
+            staking_denomination="uusk",
+            faucet_url=None,)
+
 # Load the configuration file
 config = toml.load("config.toml")
 
@@ -16,12 +25,14 @@ db_config = config["database"]
 
 
 # Define a function to check if an account exists on a blockchain
-def account_exists(blockchain, address):
-    rpc_server = rpc_servers[blockchain]
-    response = requests.get(rpc_server + "/auth/accounts/" + address)
-    print(response)
-    return response.status_code == 200
-
+def account_exists(client, address):
+    
+    try:
+        response = client.query_account(address)
+        return True
+    except Exception as e:
+        print("Error checking account:", e)
+        return False
 
 # Define a function to save a wallet address to the remote database
 def save_wallet(user_id, wallet_address):
@@ -151,12 +162,37 @@ def handle_show_command(command, username):
         cur.close()
         conn.close()
 
+def handle_test_account_exists(address):
+    kujira_client = LedgerClient(kujira_config)
+    try:
+        response = kujira_client.query_account(address)
+        return True
+    except Exception as e:
+        print("Error checking account:", e)
+        return False
+
+def handle_test_balance(address):
+    kujira_client = LedgerClient(kujira_config)
+    try:
+        balances = kujira_client.query_bank_all_balances(address)
+        for coin in balances:
+                print(f'{coin.amount}{coin.denom}')
+    except Exception as e:
+        print("Error checking balance:", e)
+        return False
 
 if __name__ == "__main__":
     while True:
         command = input("Enter command: ")
         if command.startswith("!moniter"):
             handle_save_command(command, "test_user")
+        elif command == "!test-account-exists":
+            address: str = 'kujira1x9fxqdkg4rumkzrck8t3qnhm30jgfsx9ntcpas'
+            x = handle_test_account_exists(address)
+            print(x)
+        elif command == "!test-balance":
+            address: str = 'kujira1x9fxqdkg4rumkzrck8t3qnhm30jgfsx9ntcpas'
+            handle_test_balance(address)
         elif command == "!show wallets":
             handle_show_wallets_command("test_user")
         elif command == "!show":
