@@ -61,13 +61,13 @@ def save_wallet(user_id, wallet_address):
         conn.close()
 
 
-# Define a function to handle the "!save" command
+# Define a function to handle the "!moniter" command
 def handle_save_command(command, username):
     tokens = command.split()
     print(len(tokens))
     if len(tokens) != 2:
-        # print("Invalid command: expected '!save address'")
-        return "Invalid command: expected '!save address'"
+        # print("Invalid command: expected '!moniter address'")
+        return "Invalid command: expected '!moniter address'"
     address = tokens[1]
     # Check if the address is valid for any of the supported blockchains
     valid_address = False
@@ -155,7 +155,7 @@ def handle_show_command(command, username):
 if __name__ == "__main__":
     while True:
         command = input("Enter command: ")
-        if command.startswith("!save"):
+        if command.startswith("!moniter"):
             handle_save_command(command, "test_user")
         elif command == "!show wallets":
             handle_show_wallets_command("test_user")
