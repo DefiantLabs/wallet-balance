@@ -1,6 +1,9 @@
 # IBC Monitoring Tool
 The IBC Monitoring Tool is a utility designed to address common challenges related to monitoring and managing Inter-Blockchain Communication (IBC) networks. It provides automated monitoring and alerting for near empty Cosmos account wallet balances, stuck IBC packets, expiring IBC clients, and expired IBC clients. This tool aims to enhance the stability and reliability of IBC networks by proactively identifying and resolving potential issues.
 
+## Additional Links
+check out https://github.com/imperator-co/bot_ibc_status/blob/main/relayer_status.py
+
 ## Features
 
 - **Near Empty Cosmos Account Wallet Balances:** Monitors Cosmos account wallet balances and sends alerts when the balance falls below a configurable threshold.
