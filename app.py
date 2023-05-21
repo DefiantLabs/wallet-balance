@@ -59,7 +59,7 @@ class ColoredLogger(logging.Handler):
 
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 logger.addHandler(ColoredLogger())
 
 # Configure the paths, namespaces, and relayers separately
@@ -571,6 +571,7 @@ for category, category_paths in CONFIG["paths"].items():
                 namespace, relayer, path, category_paths[path])
 
         logging.debug(f"Checking for low balance on {category} paths:")
+        check_low_native_balance(namespace, relayer, category)
         for path in category_paths.values():
             check_low_path_balance(namespace, relayer, path)
 
