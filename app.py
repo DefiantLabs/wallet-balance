@@ -47,7 +47,7 @@ class ColoredLogger(logging.Handler):
     def emit(self, record):
         message = self.format(record)
         level = record.levelname
-        if record.levelno == logging.INFO:
+        if record.levelno == logging.DEBUG:
             level = f"{Fore.YELLOW}{level}{RESET}"
         elif record.levelno == logging.INFO:
             level = f"{Fore.GREEN}{level}{RESET}"
@@ -59,7 +59,7 @@ class ColoredLogger(logging.Handler):
 
 
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.addHandler(ColoredLogger())
 
 # Configure the paths, namespaces, and relayers separately
@@ -191,7 +191,7 @@ CONFIG = {
         "odin": "relayer--mainnet"
     },
     "expiration_days_threshold_warning": 7,
-    "expiration_days_threshold_error": 2,
+    "expiration_days_threshold_error": 3,
     "log_level": LogLevel.INFO
 }
 
