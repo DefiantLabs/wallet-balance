@@ -1,203 +1,579 @@
-import toml
-import requests
-import psycopg2
+import logging
+import argparse
+import re
+import sys
+import subprocess
+import datetime
+import json
+from enum import Enum
+from colorama import Fore, Style, init
 
-from cosmpy.aerial.client import LedgerClient, NetworkConfig
+# Create the parser
+parser = argparse.ArgumentParser(description="Run checks")
 
-kujira_config = NetworkConfig(           chain_id="kaiyo-1",
-            url="grpc+https://grpc-kujira-ia.cosmosia.notional.ventures:443",
-            fee_minimum_gas_price=0,
-            fee_denomination="uusk",
-            staking_denomination="uusk",
-            faucet_url=None,)
+# Add the arguments
+parser.add_argument('--expiration', action='store_true',
+                    help='Check for expirations')
+parser.add_argument('--unrelayed', action='store_true',
+                    help='Check for unrelayed packets')
+parser.add_argument('--balance', action='store_true',
+                    help='Check for low balance')
+parser.add_argument('--all', action='store_true',
+                    help='Check all')
+# This will automatically reset the color back to default after each print
+init(autoreset=True)
 
-# Load the configuration file
-config = toml.load("config.toml")
+# Define a custom ANSI escape sequence for orange color
+ORANGE = "\033[38;5;208m"  # ANSI escape sequence for orange color
+RESET = Style.RESET_ALL
 
-# Set up the Slack webhook URL
-webhook_url = config["slack"]["webhook_url"]
-
-# Set up the RPC servers for each blockchain
-rpc_servers = config["blockchains"]
-
-# Set up the database connection
-db_config = config["database"]
+# Define the LogLevel enum
 
 
-# Define a function to check if an account exists on a blockchain
-def account_exists(client, address):
-    
+class LogLevel(Enum):
+    DEBUG = logging.DEBUG
+    INFO = logging.INFO
+    WARNING = logging.WARNING
+    ERROR = logging.ERROR
+    CRITICAL = logging.CRITICAL
+
+# Define a custom logger
+
+
+class ColoredLogger(logging.Handler):
+    def __init__(self):
+        logging.Handler.__init__(self)
+
+    def emit(self, record):
+        message = self.format(record)
+        level = record.levelname
+        if record.levelno == logging.DEBUG:
+            level = f"{Fore.YELLOW}{level}{RESET}"
+        elif record.levelno == logging.INFO:
+            level = f"{Fore.GREEN}{level}{RESET}"
+        elif record.levelno == logging.WARNING:
+            level = f"{ORANGE}{level}{RESET}"
+        elif record.levelno in [logging.ERROR, logging.CRITICAL]:
+            level = f"{Fore.RED}{level}{RESET}"
+        print(f"{level}: {message}")
+
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(ColoredLogger())
+
+# Configure the paths, namespaces, and relayers separately
+CONFIG = {
+    "native": {
+        "tokens": {
+            "loki": {
+                "alerts": {
+                    "low_balance_warn_threshold": 10000000,
+                    "low_balance_error_threshold": 3000000,
+                }
+            },
+            "factory/kujira1qk00h5atutpsv900x202pxx42npjr9thg58dnqpa72f2p7m2luase444a7/uusk": {
+                "alerts": {
+                    "low_balance_warn_threshold": 10000000,
+                    "low_balance_error_threshold": 3000000,
+                }
+            }
+        }
+    },
+    "paths": {
+        "kujira": {
+            "mainnet-kujira-akash": {
+                "chain_name": "akash",
+                "channel": "channel-64",
+                "tokens": {
+                    "uakt": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 10000000,
+                            "low_balance_error_threshold": 3000000,
+                        }
+                    }
+                }
+            },
+            "mainnet-kujira-mantle": {
+                "chain_name": "assetmantle",
+                "channel": "channel-65",
+                "tokens": {
+                    "umntl": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 10000000,
+                            "low_balance_error_threshold": 3000000,
+                        }
+                    }
+                }
+            },
+            "mainnet-kujira-crescent": {
+                "chain_name": "crescent",
+                "channel": "channel-67",
+                "tokens": {
+                    "ucre": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 10000000,
+                            "low_balance_error_threshold": 3000000,
+                        }
+                    }
+                }
+            },
+            "mainnet-kujira-neutron": {
+                "chain_name": "neutron",
+                "channel": "channel-75",
+                "tokens": {
+                    "transfer/channel-1/uatom": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 10000000,
+                            "low_balance_error_threshold": 3000000,
+                        }
+                    }
+                }
+            },
+            "mainnet-kujira-omniflixhub": {
+                "chain_name": "omniflixhub",
+                "channel": "channel-70",
+                "tokens": {
+                    "uflix": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 10000000,
+                            "low_balance_error_threshold": 3000000,
+                        }
+                    }
+                }
+            },
+            "mainnet-kujira-regen": {
+                "chain_name": "regen",
+                "channel": "channel-68",
+                "tokens": {
+                    "uregen": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 10000000,
+                            "low_balance_error_threshold": 3000000,
+                        }
+                    }
+                }
+            }
+        },
+        "odin": {
+            "mainnet-odin-osmosis": {
+                "chain_name": "osmosis",
+                "channel": "channel-3",
+                "tokens": {
+                    "uosmo": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 10000000,
+                            "low_balance_error_threshold": 3000000,
+                        }
+                    }
+                }
+            },
+            "mainnet-odin-axelar": {
+                "chain_name": "axelar",
+                "channel": "channel-37",
+                "tokens": {
+                    "uaxl": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 10000000,
+                            "low_balance_error_threshold": 3000000,
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "namespaces": {
+        "kujira": "customer-kujira",
+        "odin": "customer-odin"
+    },
+    "relayers": {
+        "kujira": "relayer--mainnet",
+        "odin": "relayer--mainnet"
+    },
+    "expiration_days_threshold_warning": 7,
+    "expiration_days_threshold_error": 3,
+    "log_level": LogLevel.INFO
+}
+
+logging.basicConfig(format='%(levelname)s: %(message)s',
+                    level=CONFIG['log_level'].value)
+
+
+def run_subprocess_command(command: list) -> str:
+    """
+    Run a subprocess command and return the output as a string.
+
+    Args:
+        command (list): The command to be executed as a list of strings.
+
+    Returns:
+        str: The output of the subprocess command as a string.
+    """
     try:
-        response = client.query_account(address)
-        return True
-    except Exception as e:
-        print("Error checking account:", e)
-        return False
-
-# Define a function to save a wallet address to the remote database
-def save_wallet(user_id, wallet_address):
-    try:
-        conn = psycopg2.connect(
-            host=db_config["host"],
-            port=db_config["port"],
-            database=db_config["database"],
-            user=db_config["username"],
-            password=db_config["password"]
-        )
-        cur = conn.cursor()
-
-        # Check if the "wallets" table exists; create it if it does not
-        cur.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'wallets')")
-        if not cur.fetchone()[0]:
-            cur.execute(
-                "CREATE TABLE wallets (id SERIAL PRIMARY KEY, user_id VARCHAR(255) NOT NULL, wallet_address VARCHAR(255) NOT NULL)"
-            )
-            conn.commit()
-            print("Created wallets table")
-
-        # Insert the wallet address and username into the "wallets" table
-        cur.execute(
-            "INSERT INTO wallets (user_id, wallet_address) VALUES (%s, %s)",
-            (user_id, wallet_address)
-        )
-        conn.commit()
-        print(f"Saved wallet {wallet_address} for user {user_id}")
-
-    except Exception as e:
-        print("Error saving wallet to database:", e)
-        conn.rollback()
-
-    finally:
-        cur.close()
-        conn.close()
+        result = subprocess.run(command, capture_output=True, text=True)
+        return result.stdout.strip()
+    except subprocess.SubprocessError as e:
+        logging.error(f"Error while running subprocess command: {e}")
+        return ""
 
 
-# Define a function to handle the "!moniter" command
-def handle_save_command(command, username):
-    tokens = command.split()
-    print(len(tokens))
-    if len(tokens) != 2:
-        # print("Invalid command: expected '!moniter address'")
-        return "Invalid command: expected '!moniter address'"
-    address = tokens[1]
-    # Check if the address is valid for any of the supported blockchains
-    valid_address = False
-    for blockchain in rpc_servers:
-        print(account_exists(blockchain, address))
-        if account_exists(blockchain, address):
-            valid_address = True
-            break
-    if not valid_address:
-        return "Invalid address: address not found on any supported blockchain"
-    # Save the wallet to the remote database and the local wallet dictionary
-    save_wallet(username, address)
-    return "Wallet {} saved for user {}".format(address, username)
+def check_expiration(path: dict):
+    """
+    Check the expiration of clients on a given path.
+
+    Args:
+        namespace (str): The namespace in which the relayer is deployed.
+        relayer (str): The name of the relayer.
+        path (str): The path to check the expiration of clients.
+    """
+    logging.debug(f"Checking for expirations on: {path}")
+    command = ['kubectl', 'exec', '-q', '-n', namespace,
+               f'deploy/{relayer}', '--', 'rly', 'q', 'clients-expiration', path]
+    output = run_subprocess_command(command)
+    if output:
+        expiring_clients = parse_expiring_clients(output)
+        warn_expiring_clients(expiring_clients)
 
 
-# Define a function to handle the "!show wallets" command
-def handle_show_wallets_command(username):
-    try:
-        conn = psycopg2.connect(
-            host=db_config["host"],
-            port=db_config["port"],
-            database=db_config["database"],
-            user=db_config["username"],
-            password=db_config["password"]
-        )
-        cur = conn.cursor()
+def check_expirations(category):
+    category_paths = CONFIG["paths"].get(category)
+    if category_paths is None:
+        logging.error(f"Category '{category}' not found in the configuration.")
+        return
 
-        # Retrieve all wallets for the user from the database
-        cur.execute(
-            "SELECT wallet_address FROM wallets WHERE user_id = %s",
-            (username,)
-        )
-        rows = cur.fetchall()
-        wallets = [row[0] for row in rows]
+    namespace = CONFIG["namespaces"].get(category)
+    if namespace is None:
+        logging.error(f"Namespace not found for category '{category}'.")
+        return
 
-        if wallets:
-            return "Wallets for user {}: {}".format(username, ", ".join(wallets))
+    relayer = CONFIG["relayers"].get(category)
+    if relayer is None:
+        logging.error(f"Relayer not found for category '{category}'.")
+        return
+
+    desired_keys = [key for key in category_paths.keys()]
+    for key in desired_keys:
+        if key not in category_paths:
+            logging.error(f"Path '{key}' not found in the configuration.")
+            continue
+        check_expiration(key)
+    logging.debug("Expiration check completed.")
+
+
+def check_unrelayed_packets(namespace: str, relayer: str, path: str, path_data: dict):
+    """
+    Check for unrelayed packets on a given path.
+
+    Args:
+        namespace (str): The namespace in which the relayer is deployed.
+        relayer (str): The name of the relayer.
+        path (dict): The path to check for unrelayed packets.
+    """
+    logging.debug(
+        f"Checking for unrelayed-packets on chain_name: {path_data['chain_name']}")
+    command = ['kubectl', 'exec', '-q', '-n', namespace,
+               f'deploy/{relayer}', '--', 'rly', 'q', 'unrelayed-packets', path, path_data['channel']]
+    output = run_subprocess_command(command)
+    if output:
+        if is_unrelayed_packets_populated(output):
+            warn_unrelayed_packets()
         else:
-            return "No wallets found for user {}".format(username)
-
-    except Exception as e:
-        print("Error retrieving wallets from database:", e)
-        conn.rollback()
-
-    finally:
-        cur.close()
-        conn.close()
+            logging.info(
+                f"No unrelayed packets found on chain_name: {path_data['chain_name']}")
 
 
-# Define a function to handle the "!show" command
-def handle_show_command(command, username):
-    tokens = command.split()
-    if len(tokens) != 1:
-        return "Invalid command: expected '!show'"
-    try:
-        conn = psycopg2.connect(
-            host=db_config["host"],
-            port=db_config["port"],
-            database=db_config["database"],
-            user=db_config["username"],
-            password=db_config["password"]
-        )
-        cur = conn.cursor()
+def check_low_path_balance(namespace: str, relayer: str, path: dict):
+    """
+    Check if the balance of a chain_name is below the low balance threshold.
 
-        # Retrieve the user's saved wallets from the database
-        cur.execute(
-            "SELECT wallet_address FROM wallets WHERE user_id = %s",
-            (username,)
-        )
-        rows = cur.fetchall()
-        if not rows:
-            return "No wallets saved for user {}".format(username)
-        wallets = "\n".join(row[0] for row in rows)
-        return "Wallets saved for user {}:\n{}".format(username, wallets)
+    Args:
+        namespace (str): The namespace in which the relayer is deployed.
+        relayer (str): The name of the relayer.
+        path (dict): The path to check the balance.
+    """
+    logging.debug(
+        f"Checking for low balance on chain_name: {path['chain_name']}")
+    command = ['kubectl', 'exec', '-q', '-n', namespace,
+               f'deploy/{relayer}', '--', 'rly', 'q', 'balance', path['chain_name']]
+    output = run_subprocess_command(command)
 
-    except Exception as e:
-        print("Error retrieving wallets from database:", e)
-        conn.rollback()
+    if output:
+        balance_data = parse_balance(output)
+        # Extract the balance value
+        for balance in balance_data['balances']:
 
-    finally:
-        cur.close()
-        conn.close()
+            amount = balance['amount']
+            denom = balance['denom']
+            if denom in path["tokens"]:
+                # Convert balance to integer
+                # Check if balance is below the error threshold
+                if amount and int(amount) <= path["tokens"][denom]["alerts"]["low_balance_error_threshold"]:
+                    logging.error(
+                        f"Low balance detected on chain_name: {path['chain_name']}. Balance: {amount} {denom}")
 
-def handle_test_account_exists(address):
-    kujira_client = LedgerClient(kujira_config)
-    try:
-        response = kujira_client.query_account(address)
-        return True
-    except Exception as e:
-        print("Error checking account:", e)
-        return False
+                # Check if balance is below the warning threshold
+                elif amount and int(amount) <= path["tokens"][denom]["alerts"]["low_balance_warn_threshold"]:
+                    logging.warning(
+                        f"Low balance detected on chain_name: {path['chain_name']}. Balance: {amount} {denom}")
+                else:
+                    logging.info(
+                        f"balance ok on chain_name: {path['chain_name']}. Balance: {amount} {denom}")
 
-def handle_test_balance(address):
-    kujira_client = LedgerClient(kujira_config)
-    try:
-        balances = kujira_client.query_bank_all_balances(address)
-        for coin in balances:
-                print(f'{coin.amount}{coin.denom}')
-    except Exception as e:
-        print("Error checking balance:", e)
-        return False
 
-if __name__ == "__main__":
-    while True:
-        command = input("Enter command: ")
-        if command.startswith("!moniter"):
-            handle_save_command(command, "test_user")
-        elif command == "!test-account-exists":
-            address: str = 'kujira1x9fxqdkg4rumkzrck8t3qnhm30jgfsx9ntcpas'
-            x = handle_test_account_exists(address)
-            print(x)
-        elif command == "!test-balance":
-            address: str = 'kujira1x9fxqdkg4rumkzrck8t3qnhm30jgfsx9ntcpas'
-            handle_test_balance(address)
-        elif command == "!show wallets":
-            handle_show_wallets_command("test_user")
-        elif command == "!show":
-            handle_show_command(command, "test_user")
-        elif command == "!exit":
-            break
-        else:
-            print("Invalid command")
+def check_low_native_balance(namespace: str, relayer: str, chain_name: str):
+    """
+    Check if the balance of a chain_name is below the low balance threshold.
+
+    Args:
+        namespace (str): The namespace in which the relayer is deployed.
+        relayer (str): The name of the relayer.
+        path (dict): The path to check the balance.
+    """
+    logging.debug(
+        f"Checking for low balance on chain_name: {chain_name}")
+    command = ['kubectl', 'exec', '-q', '-n', namespace,
+               f'deploy/{relayer}', '--', 'rly', 'q', 'balance', chain_name]
+    output = run_subprocess_command(command)
+
+    if output:
+        balance_data = parse_balance(output)
+        # Extract the balance value
+        for balance in balance_data['balances']:
+            amount = balance['amount']
+            denom = balance['denom']
+            # print(amount, denom)
+            if denom in CONFIG["native"]["tokens"]:
+                # Convert balance to integer
+                # Check if balance is below the error threshold
+                if amount and int(amount) <= CONFIG["native"]["tokens"][denom]["alerts"]["low_balance_error_threshold"]:
+                    logging.error(
+                        f"Low balance detected on chain_name: {chain_name}. Balance: {amount} {denom}")
+
+                # Check if balance is below the warning threshold
+                elif amount and int(amount) <= CONFIG["native"]["tokens"][denom]["alerts"]["low_balance_warn_threshold"]:
+                    logging.warning(
+                        f"Low balance detected on chain_name: {chain_name}. Balance: {amount} {denom}")
+                else:
+                    logging.info(
+                        f"balance ok on chain_name: {chain_name}. Balance: {amount} {denom}")
+
+def warn_unrelayed_packets():
+    """Print a warning message for unrelayed packets."""
+    logging.warning("There are unrelayed packets!")
+
+
+def parse_expiring_clients(output: str) -> list:
+    """
+    Parse the output of the 'rly q clients-expiration' command and extract expiring clients.
+
+    Args:
+        output (str): The output of the 'rly q clients-expiration' command.
+
+    Returns:
+        list: A list of expiring clients.
+    """
+    return [line for line in output.split('\n') if line.startswith('client')]
+
+
+def warn_expiring_clients(expiring_clients: list):
+    """
+    Print warning or error messages for expiring clients.
+
+    Args:
+        expiring_clients (list): A list of expiring clients.
+    """
+    now = datetime.datetime.now()
+    for client in expiring_clients:
+        client_id, chain_id = extract_expiration_info(client)
+        expiration_date = extract_expiration_date(client)
+        if expiration_date:
+            remaining_time = expiration_date - now
+            days = remaining_time.days
+            hours, remainder = divmod(remaining_time.seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            expiration_message = f"Client {client_id} on {chain_id} will expire in {days} days {hours} hours {minutes} minutes {seconds} seconds"
+            if expiration_date <= now + datetime.timedelta(days=CONFIG["expiration_days_threshold_error"]):
+                logging.error(expiration_message)
+            elif expiration_date < now + datetime.timedelta(days=CONFIG["expiration_days_threshold_warning"]):
+                logging.warning(expiration_message)
+            else:
+                logging.info(expiration_message)
+
+
+def extract_expiration_info(client: str) -> tuple:
+    """
+    Extract client ID and chain ID from the client expiration string.
+
+    Args:
+        client (str): The client expiration string.
+
+    Returns:
+        tuple: A tuple containing client ID and chain ID.
+    """
+    parts = client.split()
+    client_id = parts[1] if len(parts) > 1 else None
+    chain_id = parts[2].strip("()") if len(parts) > 2 else None
+    return client_id, chain_id
+
+
+def extract_expiration_date(client: str) -> datetime.datetime:
+    """
+    Extract the expiration date from the client expiration string.
+
+    Args:
+        client (str): The client expiration string.
+
+    Returns:
+        datetime.datetime: The expiration date.
+    """
+    parts = client.split()
+    if len(parts) >= 7:
+        expiration_date_str = ' '.join(parts[-5:-2])
+        try:
+            expiration_date = datetime.datetime.strptime(
+                expiration_date_str, "(%d %b %y")
+        except ValueError:
+            expiration_date_str = ' '.join(parts[-4:-1])
+            expiration_date = datetime.datetime.strptime(
+                expiration_date_str, "%d %b %Y")
+        return expiration_date
+    return None
+
+
+def is_unrelayed_packets_populated(output: str) -> bool:
+    """
+    Check if the output of 'rly q unrelayed-packets' command indicates unrelayed packets.
+
+    Args:
+        output (str): The output of the 'rly q unrelayed-packets' command.
+
+    Returns:
+        bool: True if unrelayed packets are found, False otherwise.
+    """
+    data = json.loads(output)
+    return data["src"] is not None or data["dst"] is not None
+
+
+def parse_balance(output: str):
+    """
+    Parse the output of the 'rly q balance' command and extract the account and balances.
+
+    Args:
+        output (str): The output of the 'rly q balance' command.
+
+    Returns:
+        dict: An object with the account and a list of balances.
+    """
+    balances = []
+    parts = output.split()
+    account = parts[1].strip("{}")
+    for part in parts[3:]:
+        tokens = part.strip("{}").split(",")
+        for token in tokens:
+            match = re.match(r'(\d+)(.*)', token)
+            if match:
+                amount, denom = match.groups()
+                amount = int(amount)  # convert string to integer
+                balances.append({"amount": amount, "denom": denom})
+    return {"account": account, "balances": balances}
+
+
+def get_chain_names() -> list:
+    """
+    Get a list of all chain_names.
+
+    Returns:
+        list: A list of chain_names.
+    """
+    command = ['rly', 'paths', 'list']
+    output = run_subprocess_command(command)
+    if output:
+        chain_names = []
+        lines = output.split('\n')
+        for line in lines:
+            parts = line.split(':')
+            if len(parts) >= 2:
+                chain_name = parts[1].strip().split()[0]
+                if chain_name not in chain_names and chain_name != 'odin':
+                    chain_names.append(chain_name)
+        return chain_names
+    return []
+
+
+def setup_config():
+    """
+    Setup the initial configuration by adding chain_names and tokens to the CONFIG dictionary.
+    """
+    chain_names = get_chain_names()
+    for category, category_paths in CONFIG["paths"].items():
+        for path in category_paths.values():
+            chain_name = path['chain_name']
+            if chain_name in chain_names:
+                command = ['rly', 'q', 'balance', chain_name]
+                output = run_subprocess_command(command)
+                if output:
+                    tokens = parse_tokens(output)
+                    if tokens:
+                        path['tokens'] = tokens
+
+
+def parse_tokens(output: str) -> list:
+    """
+    Parse the output of the 'rly q balance' command and extract the tokens.
+
+    Args:
+        output (str): The output of the 'rly q balance' command.
+
+    Returns:
+        list: A list of tokens.
+    """
+    tokens = []
+    parts = output.split()
+    for part in parts:
+        if part.startswith("10000transfer"):
+            tokens.append(part)
+    return tokens
+
+
+# Setup the initial configuration
+setup_config()
+
+# Parse the arguments
+args = parser.parse_args()
+
+for category, category_paths in CONFIG["paths"].items():
+    namespace = CONFIG["namespaces"][category]
+    relayer = CONFIG["relayers"][category]
+
+    if args.expiration:
+        logging.debug(f"Checking for expirations on {category} paths:")
+        check_expirations(category)
+
+    if args.unrelayed:
+        logging.debug(f"Checking for unrelayed-packets on {category} paths:")
+        for path in category_paths:
+            check_unrelayed_packets(
+                namespace, relayer, path, category_paths[path])
+
+    if args.balance:
+        logging.debug(f"Checking for low balance on {category} paths:")
+        check_low_native_balance(namespace, relayer, category)
+        for path in category_paths.values():
+            check_low_path_balance(namespace, relayer, path)
+
+    if args.all:
+        logging.debug(f"Checking for expirations on {category} paths:")
+        check_expirations(category)
+
+        logging.debug(f"Checking for unrelayed-packets on {category} paths:")
+        for path in category_paths:
+            check_unrelayed_packets(
+                namespace, relayer, path, category_paths[path])
+
+        logging.debug(f"Checking for low balance on {category} paths:")
+        for path in category_paths.values():
+            check_low_path_balance(namespace, relayer, path)
+
+    if not args.expiration and not args.unrelayed and not args.balance and not args.all:
+        parser.print_help()
+        sys.exit(1)
