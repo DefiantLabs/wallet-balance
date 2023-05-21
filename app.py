@@ -47,7 +47,7 @@ class ColoredLogger(logging.Handler):
     def emit(self, record):
         message = self.format(record)
         level = record.levelname
-        if record.levelno == logging.DEBUG:
+        if record.levelno == logging.INFO:
             level = f"{Fore.YELLOW}{level}{RESET}"
         elif record.levelno == logging.INFO:
             level = f"{Fore.GREEN}{level}{RESET}"
@@ -68,14 +68,14 @@ CONFIG = {
         "tokens": {
             "loki": {
                 "alerts": {
-                    "low_balance_warn_threshold": 10000000,
-                    "low_balance_error_threshold": 3000000,
+                    "low_balance_warn_threshold": 214000000,
+                    "low_balance_error_threshold": 42,
                 }
             },
             "factory/kujira1qk00h5atutpsv900x202pxx42npjr9thg58dnqpa72f2p7m2luase444a7/uusk": {
                 "alerts": {
-                    "low_balance_warn_threshold": 10000000,
-                    "low_balance_error_threshold": 3000000,
+                    "low_balance_warn_threshold": 5000000,
+                    "low_balance_error_threshold": 1000000,
                 }
             }
         }
@@ -88,7 +88,7 @@ CONFIG = {
                 "tokens": {
                     "uakt": {
                         "alerts": {
-                            "low_balance_warn_threshold": 10000000,
+                            "low_balance_warn_threshold": 14000000,
                             "low_balance_error_threshold": 3000000,
                         }
                     }
@@ -100,8 +100,8 @@ CONFIG = {
                 "tokens": {
                     "umntl": {
                         "alerts": {
-                            "low_balance_warn_threshold": 10000000,
-                            "low_balance_error_threshold": 3000000,
+                            "low_balance_warn_threshold": 1092000000,
+                            "low_balance_error_threshold": 218000000,
                         }
                     }
                 }
@@ -112,8 +112,8 @@ CONFIG = {
                 "tokens": {
                     "ucre": {
                         "alerts": {
-                            "low_balance_warn_threshold": 10000000,
-                            "low_balance_error_threshold": 3000000,
+                            "low_balance_warn_threshold": 146000000,
+                            "low_balance_error_threshold": 29000000,
                         }
                     }
                 }
@@ -124,8 +124,8 @@ CONFIG = {
                 "tokens": {
                     "transfer/channel-1/uatom": {
                         "alerts": {
-                            "low_balance_warn_threshold": 10000000,
-                            "low_balance_error_threshold": 3000000,
+                            "low_balance_warn_threshold": 475000,
+                            "low_balance_error_threshold": 95100,
                         }
                     }
                 }
@@ -136,8 +136,8 @@ CONFIG = {
                 "tokens": {
                     "uflix": {
                         "alerts": {
-                            "low_balance_warn_threshold": 10000000,
-                            "low_balance_error_threshold": 3000000,
+                            "low_balance_warn_threshold": 13000000,
+                            "low_balance_error_threshold": 2660000,
                         }
                     }
                 }
@@ -148,8 +148,8 @@ CONFIG = {
                 "tokens": {
                     "uregen": {
                         "alerts": {
-                            "low_balance_warn_threshold": 10000000,
-                            "low_balance_error_threshold": 3000000,
+                            "low_balance_warn_threshold": 56000000,
+                            "low_balance_error_threshold": 11000000,
                         }
                     }
                 }
@@ -162,8 +162,8 @@ CONFIG = {
                 "tokens": {
                     "uosmo": {
                         "alerts": {
-                            "low_balance_warn_threshold": 10000000,
-                            "low_balance_error_threshold": 3000000,
+                            "low_balance_warn_threshold": 8000000,
+                            "low_balance_error_threshold": 1650000,
                         }
                     }
                 }
@@ -175,7 +175,7 @@ CONFIG = {
                     "uaxl": {
                         "alerts": {
                             "low_balance_warn_threshold": 10000000,
-                            "low_balance_error_threshold": 3000000,
+                            "low_balance_error_threshold": 2000000,
                         }
                     }
                 }
@@ -191,7 +191,7 @@ CONFIG = {
         "odin": "relayer--mainnet"
     },
     "expiration_days_threshold_warning": 7,
-    "expiration_days_threshold_error": 3,
+    "expiration_days_threshold_error": 2,
     "log_level": LogLevel.INFO
 }
 
@@ -356,6 +356,7 @@ def check_low_native_balance(namespace: str, relayer: str, chain_name: str):
                 else:
                     logging.info(
                         f"balance ok on chain_name: {chain_name}. Balance: {amount} {denom}")
+
 
 def warn_unrelayed_packets():
     """Print a warning message for unrelayed packets."""
