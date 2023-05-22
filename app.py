@@ -190,8 +190,8 @@ CONFIG = {
         "kujira": "relayer--mainnet",
         "odin": "relayer--mainnet"
     },
-    "expiration_days_threshold_warning": 7,
-    "expiration_days_threshold_error": 3,
+    "expiration_days_threshold_warning": 5,
+    "expiration_days_threshold_error": 2,
     "log_level": LogLevel.INFO
 }
 
