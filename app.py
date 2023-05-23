@@ -153,6 +153,18 @@ CONFIG = {
                         }
                     }
                 }
+            },
+            "mainnet-kujira-noble": {
+                "chain_name": "noble",
+                "channel": "channel-62",
+                "tokens": {
+                    "transfer/channel-4/uatom": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 475000,
+                            "low_balance_error_threshold": 95100,
+                        }
+                    }
+                }
             }
         },
         "odin": {
@@ -276,7 +288,7 @@ def check_unrelayed_packets(namespace: str, relayer: str, path: str, path_data: 
     output = run_subprocess_command(command)
     if output:
         if is_unrelayed_packets_populated(output):
-            warn_unrelayed_packets()
+            warn_unrelayed_packets(path_data['chain_name'],output)
         else:
             logging.info(
                 f"No unrelayed packets found on chain_name: {path_data['chain_name']}")
@@ -358,9 +370,9 @@ def check_low_native_balance(namespace: str, relayer: str, chain_name: str):
                         f"balance ok on chain_name: {chain_name}. Balance: {amount} {denom}")
 
 
-def warn_unrelayed_packets():
+def warn_unrelayed_packets(name: str, output: str):
     """Print a warning message for unrelayed packets."""
-    logging.warning("There are unrelayed packets!")
+    logging.warning("There are unrelayed packets on chain_name: " + name + "\n" + output)
 
 
 def parse_expiring_clients(output: str) -> list:
