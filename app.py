@@ -243,8 +243,11 @@ def check_expiration(path: dict):
                f'deploy/{relayer}', '--', 'rly', 'q', 'clients-expiration', path]
     output = run_subprocess_command(command)
     if output:
-        expiring_clients = parse_expiring_clients(output)
-        warn_expiring_clients(expiring_clients)
+        try:
+            expiring_clients = parse_expiring_clients(output)
+            warn_expiring_clients(expiring_clients)
+        except Exception as e:
+            logging.error(f"Error while parsing expiring clients: {e}")
 
 
 def check_expirations(category):
