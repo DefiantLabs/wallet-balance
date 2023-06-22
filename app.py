@@ -59,7 +59,7 @@ class ColoredLogger(logging.Handler):
 
 
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.addHandler(ColoredLogger())
 
 # Configure the paths, namespaces, and relayers separately
