@@ -59,7 +59,7 @@ class ColoredLogger(logging.Handler):
 
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 logger.addHandler(ColoredLogger())
 
 # Configure the paths, namespaces, and relayers separately
@@ -126,6 +126,18 @@ CONFIG = {
                         "alerts": {
                             "low_balance_warn_threshold": 475000,
                             "low_balance_error_threshold": 95100,
+                        }
+                    }
+                }
+            },
+            "mainnet-kujira-kava": {
+                "chain_name": "kava",
+                "channel": "channel-95",
+                "tokens": {
+                    "ukava": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 563637,
+                            "low_balance_error_threshold": 140909,
                         }
                     }
                 }
