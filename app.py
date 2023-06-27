@@ -72,10 +72,10 @@ CONFIG = {
                     "low_balance_error_threshold": 42,
                 }
             },
-            "factory/kujira1qk00h5atutpsv900x202pxx42npjr9thg58dnqpa72f2p7m2luase444a7/uusk": {
+            "ukuji": {
                 "alerts": {
-                    "low_balance_warn_threshold": 5000000,
-                    "low_balance_error_threshold": 1000000,
+                    "low_balance_warn_threshold": 2519599,
+                    "low_balance_error_threshold": 1519599,
                 }
             }
         }
