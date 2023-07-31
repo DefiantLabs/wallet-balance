@@ -168,6 +168,18 @@ CONFIG = {
             },
             "mainnet-kujira-noble": {
                 "chain_name": "noble",
+                "channel": "channel-69",
+                "tokens": {
+                    "usomm": {
+                        "alerts": {
+                            "low_balance_warn_threshold": 15000000,
+                            "low_balance_error_threshold": 5000000,
+                        }
+                    }
+                }
+            },
+            "mainnet-kujira-sommelier": {
+                "chain_name": "sommelier",
                 "channel": "channel-62",
                 "tokens": {
                     "transfer/channel-4/uatom": {
