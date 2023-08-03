@@ -166,9 +166,9 @@ CONFIG = {
                     }
                 }
             },
-            "mainnet-kujira-noble": {
-                "chain_name": "noble",
-                "channel": "channel-62",
+            "mainnet-kujira-sommelier": {
+                "chain_name": "sommelier",
+                "channel": "channel-69",
                 "tokens": {
                     "usomm": {
                         "alerts": {
@@ -178,9 +178,9 @@ CONFIG = {
                     }
                 }
             },
-            "mainnet-kujira-sommelier": {
-                "chain_name": "sommelier",
-                "channel": "channel-69",
+            "mainnet-kujira-noble": {
+                "chain_name": "noble",
+                "channel": "channel-62",
                 "tokens": {
                     "transfer/channel-4/uatom": {
                         "alerts": {
@@ -247,8 +247,8 @@ def run_subprocess_command(command: list) -> str:
     """
     try:
         result = subprocess.run(command, capture_output=True, text=True)
-        print(result)
-        # return result.stdout.strip()
+        # print(result)
+        return result.stdout.strip()
     except subprocess.SubprocessError as e:
         logging.error(f"Error while running subprocess command: {e}")
         return ""
