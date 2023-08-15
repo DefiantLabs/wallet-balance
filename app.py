@@ -603,8 +603,8 @@ for category, category_paths in CONFIG["paths"].items():
             check_low_path_balance(namespace, relayer, path)
 
     if args.all:
-        logging.debug(f"Checking for expirations on {category} paths:")
-        check_expirations(category)
+        # logging.debug(f"Checking for expirations on {category} paths:")
+        # check_expirations(category)
 
         logging.debug(f"Checking for unrelayed-packets on {category} paths:")
         for path in category_paths:
